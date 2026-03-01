@@ -18,7 +18,7 @@
    ```
 2. Создайте переменную окружения:
    ```bash
-   export TELEGRAM_BOT_TOKEN="<ваш_токен>"
+   export TELEGRAM_BOT_TOKEN="8646455200:AAHRQB6baOGepZY70mlQ5Iap_2LwOMMMbdY"
    ```
    Или используйте файл `.env` по примеру `.env.example`.
 3. Запустите бота:

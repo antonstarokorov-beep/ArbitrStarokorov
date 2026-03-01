@@ -207,11 +207,7 @@ def extract_number(text: str) -> Optional[int]:
 
 
 def main() -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "Не найден TELEGRAM_BOT_TOKEN. Укажите токен в переменной окружения и перезапустите бота."
-        )
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "8646455200:AAHRQB6baOGepZY70mlQ5Iap_2LwOMMMbdY")
 
     app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
