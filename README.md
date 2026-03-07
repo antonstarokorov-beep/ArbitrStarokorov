@@ -103,3 +103,21 @@ pip install xhtml2pdf
 ```bash
 pip install -r requirements.txt --proxy http://USER:PASS@HOST:PORT
 ```
+
+
+## Диагностика проблем на Windows (скрипт)
+
+Добавлен скрипт `diagnose_windows.ps1`, который проверяет:
+
+- наличие `py`/`python` в PATH;
+- наличие ключевых файлов проекта;
+- наличие/создание `.venv`;
+- установлены ли `PyQt6`, `xhtml2pdf`, `pyinstaller` в `.venv`.
+
+Запуск (PowerShell в корне проекта):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\diagnose_windows.ps1
+```
+
+Скрипт не меняет код приложения и выводит, что именно отсутствует и какие команды запускать дальше.
