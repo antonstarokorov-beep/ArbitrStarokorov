@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Иджис — Живи без долгов!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              brandBlue: '#2781C2',
+              brandRed: '#D54047',
+              lightBg: '#F5F7FA'
+            },
+            boxShadow: {
+              soft: '0 10px 30px rgba(39, 129, 194, 0.12)'
+            }
+          }
+        }
+      };
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body class="bg-lightBg text-slate-800">
+    <div class="min-h-screen flex flex-col">
+      <header class="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-slate-200">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <img
+              src="https://placehold.co/80x80/ffffff/2781C2?text=Иджис"
+              alt="Иджис — Живи без долгов!"
+              class="h-12 w-12 rounded-lg object-cover border border-slate-200"
+            />
+            <div>
+              <p class="text-xl font-semibold tracking-wide">Иджис</p>
+              <p class="text-sm text-slate-500">Живи без долгов!</p>
+            </div>
+          </div>
+          <div class="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+            <i data-lucide="shield-check" class="h-4 w-4 text-brandBlue"></i>
+            <span>ФЗ-127: точная правовая диагностика</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 w-full">
+        <div class="max-w-4xl mx-auto px-4 py-6 md:py-10">
+          <section class="bg-white border border-slate-200 rounded-2xl shadow-soft overflow-hidden">
+            <div class="p-4 md:p-6 border-b border-slate-100 bg-gradient-to-r from-brandBlue to-sky-500 text-white">
+              <h1 class="text-lg md:text-2xl font-semibold">Интеллектуальный помощник по списанию долгов</h1>
+              <p class="text-sm md:text-base text-blue-100 mt-1">
+                Чат-диагностика определит: внесудебное банкротство через МФЦ или судебная процедура.
+              </p>
+            </div>
+
+            <div id="chat" class="h-[58vh] min-h-[420px] overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50"></div>
+
+            <div class="border-t border-slate-200 p-4 md:p-6 bg-white">
+              <div id="input-area" class="space-y-3"></div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const chatEl = document.getElementById('chat');
+      const inputArea = document.getElementById('input-area');
+
+      const state = {
+        step: 'greeting',
+        data: {
+          debt: null,
+          debtSource: null,
+          hasAssets: null,
+          enforcementEnded: null,
+          income: null,
+          monthlyDebtPayment: null,
+          delayMonths: null
+        },
+        result: null
+      };
+
+      const flow = {
+        greeting: {
+          question:
+            'Здравствуйте! Я — ваш интеллектуальный помощник Иджис. Помогу понять, подходит ли вам списание долгов. Готовы пройти быструю диагностику?',
+          type: 'options',
+          options: [
+            { label: 'Да, начать', value: 'start' },
+            { label: 'Нужна консультация менеджера', value: 'lead' }
+          ],
+          next: answer => (answer === 'start' ? 'debt' : 'leadForm')
+        },
+        debt: {
+          question: 'Укажите общую сумму ваших долгов (в рублях).',
+          type: 'number',
+          key: 'debt',
+          placeholder: 'Например: 780000',
+          next: () => 'debtSource'
+        },
+        debtSource: {
+          question: 'Основной источник долга?',
+          type: 'options',
+          key: 'debtSource',
+          options: [
+            { label: 'Кредиты и займы', value: 'credit' },
+            { label: 'Налоги / штрафы', value: 'tax' },
+            { label: 'Комбинированный долг', value: 'mixed' }
+          ],
+          next: () => 'assets'
+        },
+        assets: {
+          question: 'Есть ли у вас имущество, которое можно реализовать (кроме единственного жилья)?',
+          type: 'options',
+          key: 'hasAssets',
+          options: [
+            { label: 'Да', value: 'yes' },
+            { label: 'Нет', value: 'no' }
+          ],
+          next: () => 'enforcement'
+        },
+        enforcement: {
+          question:
+            'Исполнительное производство завершено судебным приставом по причине отсутствия имущества (п.4 ч.1 ст.46)?',
+          type: 'options',
+          key: 'enforcementEnded',
+          options: [
+            { label: 'Да, завершено', value: 'yes' },
+            { label: 'Нет / не знаю', value: 'no' }
+          ],
+          next: () => 'income'
+        },
+        income: {
+          question: 'Какой ваш средний ежемесячный доход (руб.)?',
+          type: 'number',
+          key: 'income',
+          placeholder: 'Например: 45000',
+          next: () => 'payments'
+        },
+        payments: {
+          question: 'Сколько в месяц вы обязаны платить по долгам (руб.)?',
+          type: 'number',
+          key: 'monthlyDebtPayment',
+          placeholder: 'Например: 39000',
+          next: () => 'delays'
+        },
+        delays: {
+          question: 'Сколько месяцев длится просрочка по обязательствам?',
+          type: 'number',
+          key: 'delayMonths',
+          placeholder: 'Например: 4',
+          next: () => 'result'
+        },
+        result: { type: 'result' },
+        leadForm: { type: 'leadForm' }
+      };
+
+      function formatCurrency(value) {
+        return new Intl.NumberFormat('ru-RU').format(Number(value || 0)) + ' ₽';
+      }
+
+      function addMessage(text, sender = 'bot') {
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex ${sender === 'bot' ? 'justify-start' : 'justify-end'} opacity-0 translate-y-2 transition-all duration-500`;
+
+        const bubble = document.createElement('div');
+        bubble.className =
+          sender === 'bot'
+            ? 'max-w-[85%] md:max-w-[75%] bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm'
+            : 'max-w-[85%] md:max-w-[75%] bg-brandBlue text-white rounded-2xl rounded-tr-sm px-4 py-3 shadow-sm';
+        bubble.innerText = text;
+
+        wrapper.appendChild(bubble);
+        chatEl.appendChild(wrapper);
+
+        requestAnimationFrame(() => {
+          wrapper.classList.remove('opacity-0', 'translate-y-2');
+        });
+
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      function createButtonOption(option, onSelect) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className =
+          'w-full sm:w-auto px-4 py-2 rounded-xl border border-brandBlue text-brandBlue hover:bg-brandBlue hover:text-white transition-colors';
+        btn.textContent = option.label;
+        btn.addEventListener('click', () => onSelect(option));
+        return btn;
+      }
+
+      function renderInput(stepKey) {
+        const step = flow[stepKey];
+        inputArea.innerHTML = '';
+
+        if (!step || step.type === 'result' || step.type === 'leadForm') {
+          return;
+        }
+
+        if (step.type === 'options') {
+          const row = document.createElement('div');
+          row.className = 'flex flex-col sm:flex-row gap-2';
+          step.options.forEach(option => {
+            row.appendChild(
+              createButtonOption(option, selected => {
+                if (step.key) state.data[step.key] = selected.value;
+                addMessage(selected.label, 'user');
+                goTo(step.next(selected.value));
+              })
+            );
+          });
+          inputArea.appendChild(row);
+          return;
+        }
+
+        if (step.type === 'number') {
+          const form = document.createElement('form');
+          form.className = 'flex flex-col sm:flex-row gap-2';
+
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.min = '0';
+          input.required = true;
+          input.placeholder = step.placeholder;
+          input.className =
+            'flex-1 rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brandBlue';
+
+          const submit = document.createElement('button');
+          submit.type = 'submit';
+          submit.className = 'px-5 py-2 rounded-xl bg-brandRed text-white hover:bg-red-600 transition-colors';
+          submit.textContent = 'Отправить';
+
+          form.append(input, submit);
+          form.addEventListener('submit', e => {
+            e.preventDefault();
+            const value = Number(input.value);
+            if (Number.isNaN(value) || value < 0) return;
+            state.data[step.key] = value;
+            addMessage(formatCurrency(value), 'user');
+            goTo(step.next());
+          });
+
+          inputArea.appendChild(form);
+          input.focus();
+        }
+      }
+
+      function evaluateResult() {
+        const {
+          debt,
+          enforcementEnded,
+          hasAssets,
+          income,
+          monthlyDebtPayment,
+          delayMonths
+        } = state.data;
+
+        const mfcEligible =
+          debt >= 25000 &&
+          debt <= 1000000 &&
+          enforcementEnded === 'yes' &&
+          hasAssets === 'no';
+
+        const paymentPressure = income < monthlyDebtPayment;
+        const inabilityToPay = paymentPressure || delayMonths >= 3;
+        const judicialEligible = debt > 500000 || inabilityToPay;
+
+        state.result = {
+          mfcEligible,
+          judicialEligible,
+          inabilityToPay,
+          paymentPressure
+        };
+      }
+
+      function showResult() {
+        evaluateResult();
+        const { data, result } = state;
+
+        addMessage(
+          `Спасибо! Диагностика завершена.\n\nВаш долг: ${formatCurrency(data.debt)}\nПросрочка: ${data.delayMonths} мес.\nДоход/платеж: ${formatCurrency(data.income)} / ${formatCurrency(
+            data.monthlyDebtPayment
+          )}`
+        );
+
+        if (result.mfcEligible) {
+          addMessage(
+            '✅ Предварительный вывод: вам подходит ВНЕСУДЕБНОЕ банкротство через МФЦ (ФЗ №127). Условия по сумме долга и завершению исполнительного производства соблюдены.'
+          );
+        } else if (result.judicialEligible) {
+          addMessage(
+            '⚖️ Предварительный вывод: рекомендуется СУДЕБНОЕ банкротство. Основание: крупный долг и/или признаки устойчивой неплатежеспособности.'
+          );
+        } else {
+          addMessage(
+            'ℹ️ По текущим данным признаки банкротства недостаточны для стандартного сценария. Но можно проработать законные варианты защиты и реструктуризации.'
+          );
+        }
+
+        const reasons = [];
+        if (data.debt > 500000) reasons.push('долг выше 500 000 ₽');
+        if (result.inabilityToPay) reasons.push('есть признаки невозможности платить (просрочка/финансовая нагрузка)');
+        if (data.enforcementEnded === 'yes') reasons.push('исполнительное производство завершено');
+
+        addMessage(`Юридически значимые факторы: ${reasons.length ? reasons.join('; ') : 'требуется дополнительная проверка документов'}.`);
+
+        setTimeout(() => goTo('leadForm'), 500);
+      }
+
+      function showLeadForm() {
+        inputArea.innerHTML = '';
+
+        const card = document.createElement('div');
+        card.className = 'rounded-2xl border border-brandBlue/30 bg-blue-50 p-4 md:p-5';
+        card.innerHTML = `
+          <div class="flex items-center gap-2 text-brandBlue mb-3">
+            <i data-lucide="phone-call" class="h-5 w-5"></i>
+            <h2 class="font-semibold text-base md:text-lg">Получить детальный план списания долгов</h2>
+          </div>
+          <form id="lead-form" class="grid gap-3 md:grid-cols-2">
+            <input name="name" required placeholder="Ваше имя" class="rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brandBlue" />
+            <input name="phone" required placeholder="Телефон" class="rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brandBlue" />
+            <input name="city" placeholder="Город" class="rounded-xl border border-slate-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-brandBlue md:col-span-2" />
+            <button type="submit" class="md:col-span-2 rounded-xl bg-brandRed text-white py-2.5 font-medium hover:bg-red-600 transition-colors">Получить консультацию</button>
+          </form>
+          <p class="text-xs text-slate-500 mt-2">Нажимая кнопку, вы соглашаетесь на обработку персональных данных.</p>
+        `;
+
+        inputArea.appendChild(card);
+        lucide.createIcons();
+
+        const form = card.querySelector('#lead-form');
+        form.addEventListener('submit', e => {
+          e.preventDefault();
+          const formData = new FormData(form);
+          const name = formData.get('name');
+          addMessage(`Отлично, ${name}! Юрист Иджис свяжется с вами в ближайшее время.`);
+          form.reset();
+        });
+      }
+
+      function goTo(stepKey) {
+        state.step = stepKey;
+        const step = flow[stepKey];
+
+        if (stepKey === 'result') {
+          showResult();
+          return;
+        }
+
+        if (stepKey === 'leadForm') {
+          showLeadForm();
+          return;
+        }
+
+        addMessage(step.question, 'bot');
+        renderInput(stepKey);
+      }
+
+      goTo('greeting');
+      lucide.createIcons();
+    </script>
+  </body>
+</html>
