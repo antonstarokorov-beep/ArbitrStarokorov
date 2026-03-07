@@ -105,6 +105,20 @@ pip install -r requirements.txt --proxy http://USER:PASS@HOST:PORT
 ```
 
 
+
+6. Ошибка `No matching distribution found for PyQt6` обычно означает одно из трёх:
+
+- установлен 32-bit Python (нужен 64-bit);
+- сетевой доступ к `pypi.org:443` блокируется (прокси/фаервол);
+- `pip` в окружении использует недоступный индекс.
+
+Попробуйте команды:
+
+```bash
+pip install -r requirements.txt --prefer-binary --retries 15 --timeout 120
+pip install -r requirements.txt -i https://pypi.org/simple --trusted-host pypi.org --trusted-host files.pythonhosted.org
+```
+
 ## Диагностика проблем на Windows (скрипт)
 
 Добавлен скрипт `diagnose_windows.ps1`, который проверяет:
