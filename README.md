@@ -1,69 +1,177 @@
-# ArbitrStarokorov — прототип оценки автомобиля
+# Apex Intelligence MVP Backend
 
-Настольное приложение на **Python + PyQt6** для арбитражного управляющего, которое помогает оценивать рыночную стоимость автомобиля сравнительным подходом по аналогам из объявлений.
+Backend-first skeleton для legal marketing intelligence platform с осью данных:
 
-## Возможности прототипа
+`lead -> click_id -> bot_chat_id -> crm_deal_id -> revenue`
 
-- ввод параметров оцениваемого авто (марка, модель, год, пробег, регион, состояние);
-- выбор сайтов-источников (заглушки `Сайт1` и `Сайт2`);
-- поиск и показ аналогов в таблице;
-- исключение отдельных объявлений из расчёта через чекбоксы;
-- расчёт итоговой стоимости (по медиане), диапазона и статистики;
-- сохранение результатов и объявлений в SQLite (`valuation_history.db`);
-- просмотр истории оценок и загрузка объявлений из истории;
-- формирование отчёта в PDF (HTML -> PDF через `xhtml2pdf`).
+## Что реализовано
 
-## Структура проекта
+- FastAPI API (`app/main.py`)
+- Pydantic v2 схемы (`app/schemas/`)
+- SQLAlchemy 2.0 модели (`app/models/`):
+  - `leads`
+  - `bot_events`
+  - `crm_events`
+  - `lead_touchpoints`
+- Repository layer (`app/repositories/`)
+- Service layer (`app/services/`)
+- PostgreSQL-конфиг через env (`app/core/config.py`)
+- Alembic + первая миграция (`alembic/versions/20260315_0001_initial_schema.py`)
+- Render blueprint (`render.yaml`) для стабильного деплоя
+
+## Структура
 
 ```text
 .
-├── app/
-│   ├── core/         # модели и расчёт
-│   ├── parsers/      # интерфейс парсера и dummy-реализации
-│   ├── reporting/    # генерация HTML/PDF отчёта
-│   ├── storage/      # SQLite слой
-│   └── ui/           # PyQt6 интерфейс
-├── main.py           # точка входа
+├── app
+│   ├── api/v1
+│   ├── core/config.py
+│   ├── db
+│   ├── models
+│   ├── repositories
+│   ├── schemas
+│   ├── services
+│   └── main.py
+├── alembic
+│   └── versions
+├── alembic.ini
+├── .env.example
+├── main.py
+├── render.yaml
 └── requirements.txt
 ```
 
-## Установка и запуск
+## Локальный запуск
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python main.py
+cp .env.example .env
+alembic upgrade head
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-
-## Быстрый запуск на Windows (в 1 клик)
-
-В репозитории добавлены готовые bat-скрипты:
-
-- `run_windows.bat` — создаёт `.venv`, ставит зависимости и запускает приложение;
-- `build_windows.bat` — создаёт `.venv`, ставит зависимости и собирает `dist\CarValuationApp.exe`.
-
-Запуск:
-
-1. Откройте папку проекта в Проводнике.
-2. Дважды кликните `run_windows.bat`.
-3. Дождитесь установки зависимостей и запуска окна программы.
-
-Сборка EXE:
-
-1. Дважды кликните `build_windows.bat`.
-2. После успешной сборки используйте `dist\CarValuationApp.exe`.
-
-## Сборка в один EXE (Windows)
+Проверка здоровья:
 
 ```bash
-pyinstaller --noconfirm --onefile --windowed --name CarValuationApp main.py
+curl http://127.0.0.1:8000/health
 ```
 
-Готовый исполняемый файл будет в папке `dist/CarValuationApp.exe`.
+Ожидается:
 
-## Примечания
+```json
+{"status": "ok"}
+```
 
-- Парсеры в `app/parsers/dummy.py` не делают реальных HTTP-запросов и генерируют тестовые данные.
-- Для интеграции с реальными сайтами достаточно добавить новые классы-парсеры, наследующие `BaseSiteParser`, и подключить их в UI.
+## Деплой на Render (пошагово)
+
+### 1) Почему у вас упал build
+
+Вы деплоили коммит `756141a...`, где в `requirements.txt` были desktop-зависимости (`PyQt6`, `xhtml2pdf`, `pyinstaller`). Render пытался собрать их на Python 3.14, что привело к ошибке в `python-bidi`/Rust toolchain.
+
+Нужно деплоить **текущий backend-коммит**, где зависимости backend-only.
+
+### 2) Создание Web Service
+
+1. Render -> **New +** -> **Web Service**
+2. Подключите GitHub-репозиторий
+3. В поле branch укажите нужную ветку с backend-кодом
+4. Build command:
+   - `pip install -r requirements.txt`
+5. Start command:
+   - `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+Либо используйте `render.yaml` (Blueprint deploy) — команда и env уже зашиты.
+
+### 3) Обязательные env-переменные в Render
+
+- `PYTHON_VERSION=3.11.9`
+- `APP_NAME=Apex Intelligence API`
+- `APP_VERSION=0.1.0`
+- `DEBUG=false`
+- `POSTGRES_USER=...`
+- `POSTGRES_PASSWORD=...`
+- `POSTGRES_HOST=...`
+- `POSTGRES_PORT=5432`
+- `POSTGRES_DB=...`
+
+## Neon: где взять доступы (очень подробно)
+
+### Вариант A (через веб-интерфейс Neon, проще всего)
+
+1. Войдите на https://console.neon.tech
+2. Создайте Project
+3. Откройте проект -> слева **Dashboard**
+4. Найдите блок **Connection string** или кнопку **Connect**
+5. Выберите:
+   - Role: обычно `neondb_owner`
+   - Database: обычно `neondb`
+   - Branch: `main`
+6. Скопируйте connection string вида:
+   - `postgresql://USER:PASSWORD@HOST/DB?sslmode=require`
+
+Из строки берём переменные так:
+
+- `POSTGRES_USER` = `USER`
+- `POSTGRES_PASSWORD` = `PASSWORD`
+- `POSTGRES_HOST` = `HOST`
+- `POSTGRES_PORT` = `5432` (если явно не указан)
+- `POSTGRES_DB` = `DB`
+
+Пример разбора вашей строки:
+
+`postgresql://neondb_owner:npg_***@ep-misty-scene-agv4om3v-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
+
+- `POSTGRES_USER=neondb_owner`
+- `POSTGRES_PASSWORD=npg_***`
+- `POSTGRES_HOST=ep-misty-scene-agv4om3v-pooler.c-2.eu-central-1.aws.neon.tech`
+- `POSTGRES_PORT=5432`
+- `POSTGRES_DB=neondb`
+
+### Вариант B (через CLI `neonctl`)
+
+CLI не обязателен для Render деплоя, но если используете:
+
+```bash
+neonctl projects list
+neonctl connection-string --project-id <project_id> --database-name neondb --role-name neondb_owner
+```
+
+Далее разбираете строку так же, как выше.
+
+## Применение миграций (обязательно)
+
+После того как env-переменные заполнены, нужно применить Alembic миграцию к Neon БД:
+
+```bash
+alembic upgrade head
+```
+
+Где запустить:
+- локально (с теми же env на Neon), либо
+- через отдельный one-off job/CI step.
+
+## Как проверить, что всё поднялось
+
+После успешного деплоя на Render:
+
+1. Откройте URL сервиса, например:
+   - `https://<your-service>.onrender.com/health`
+2. Должен вернуться JSON:
+   - `{"status":"ok"}`
+3. Далее тест API:
+   - `POST /api/v1/dev/seed`
+   - `GET /api/v1/dashboard/summary`
+
+## Эндпоинты
+
+- `GET /health`
+- `POST /api/v1/leads`
+- `GET /api/v1/leads`
+- `GET /api/v1/leads/{lead_id}`
+- `PATCH /api/v1/leads/{lead_id}`
+- `POST /api/v1/bot/events`
+- `POST /api/v1/crm/events`
+- `GET /api/v1/dashboard/summary`
+- `POST /api/v1/dev/seed`
